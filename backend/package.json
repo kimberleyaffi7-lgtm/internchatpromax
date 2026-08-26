@@ -1,6 +1,6 @@
 {
   "name": "internal-ai-chat-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,10 +22,8 @@
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.10.0",
-    "multer": "^2.0.2",
     "pdf-parse": "^1.1.1",
     "pg": "^8.16.3",
-    "pptx2json": "^1.1.1",
     "tar": "^7.4.3",
     "xlsx": "^0.18.5",
     "zod": "^4.0.17"
@@ -36,7 +34,6 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^2.0.0",
     "@types/node": "^24.3.0",
     "@types/pg": "^8.15.5",
     "tsx": "^4.20.3",
