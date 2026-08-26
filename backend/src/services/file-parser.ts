@@ -7,7 +7,7 @@ import { downloadObject } from "./storage.js";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
-import tar from "tar";
+import * as tar from "tar";
 
 const textExt = new Set([
   "txt",
@@ -51,11 +51,15 @@ function safeName(name: string) {
     .slice(0, 200);
 }
 
-async function collectFiles(dir: string): Promise<string[]> {
+async function collectFiles(
+  dir: string
+): Promise<string[]> {
   const out: string[] = [];
 
   const walk = async (d: string) => {
-    for (const e of await fs.readdir(d, { withFileTypes: true })) {
+    for (const e of await fs.readdir(d, {
+      withFileTypes: true
+    })) {
       const p = path.join(d, e.name);
 
       if (e.isSymbolicLink()) continue;
@@ -64,26 +68,39 @@ async function collectFiles(dir: string): Promise<string[]> {
         if (!ignored.test(p)) {
           await walk(p);
         }
-      } else if (e.isFile() && !ignored.test(p)) {
+      } else if (
+        e.isFile() &&
+        !ignored.test(p)
+      ) {
         out.push(p);
       }
 
       if (out.length > MAX_FILES) {
-        throw new Error("Archive contains too many files");
+        throw new Error(
+          "Archive contains too many files"
+        );
       }
     }
   };
 
   await walk(dir);
+
   return out;
 }
 
-function chunks(text: string, size = 6000, overlap = 500) {
+function chunks(
+  text: string,
+  size = 6000,
+  overlap = 500
+) {
   const result: string[] = [];
   let i = 0;
 
   while (i < text.length) {
-    const end = Math.min(text.length, i + size);
+    const end = Math.min(
+      text.length,
+      i + size
+    );
 
     result.push(text.slice(i, end));
 
@@ -105,21 +122,33 @@ export async function parseStoredFile(
     path.join(os.tmpdir(), "internal-ai-")
   );
 
-  const target = path.join(tmp, safeName(originalName));
+  const target = path.join(
+    tmp,
+    safeName(originalName)
+  );
 
   try {
-    const obj = await downloadObject(storageKey);
+    const obj = await downloadObject(
+      storageKey
+    );
 
     if (!obj.Body) {
-      throw new Error("Stored object has no body");
+      throw new Error(
+        "Stored object has no body"
+      );
     }
 
     await pipeline(
       obj.Body as any,
-      (await import("node:fs")).createWriteStream(target)
+      (
+        await import("node:fs")
+      ).createWriteStream(target)
     );
 
-    const ext = path.extname(originalName).toLowerCase().slice(1);
+    const ext = path
+      .extname(originalName)
+      .toLowerCase()
+      .slice(1);
 
     const outputs: {
       path: string;
@@ -129,13 +158,18 @@ export async function parseStoredFile(
     if (textExt.has(ext)) {
       outputs.push({
         path: originalName,
-        content: await fs.readFile(target, "utf8")
+        content: await fs.readFile(
+          target,
+          "utf8"
+        )
       });
     } else if (ext === "pdf") {
       outputs.push({
         path: originalName,
         content: (
-          await pdfParse(await fs.readFile(target))
+          await pdfParse(
+            await fs.readFile(target)
+          )
         ).text
       });
     } else if (ext === "docx") {
@@ -147,47 +181,74 @@ export async function parseStoredFile(
           })
         ).value
       });
-    } else if (ext === "xlsx" || ext === "xls") {
-      const wb = XLSX.read(await fs.readFile(target), {
-        type: "buffer"
-      });
+    } else if (
+      ext === "xlsx" ||
+      ext === "xls"
+    ) {
+      const wb = XLSX.read(
+        await fs.readFile(target),
+        {
+          type: "buffer"
+        }
+      );
 
       for (const s of wb.SheetNames) {
         outputs.push({
           path: `${originalName}::${s}`,
-          content: XLSX.utils.sheet_to_csv(wb.Sheets[s])
+          content:
+            XLSX.utils.sheet_to_csv(
+              wb.Sheets[s]
+            )
         });
       }
     } else if (ext === "zip") {
-      const extract = path.join(tmp, "extract");
+      const extract = path.join(
+        tmp,
+        "extract"
+      );
 
       await fs.mkdir(extract);
 
-      const { execFile } = await import(
-        "node:child_process"
+      const { execFile } =
+        await import(
+          "node:child_process"
+        );
+
+      await new Promise<void>(
+        (resolve, reject) =>
+          execFile(
+            "unzip",
+            [
+              "-q",
+              target,
+              "-d",
+              extract
+            ],
+            {
+              timeout: 120000
+            },
+            (e) =>
+              e
+                ? reject(e)
+                : resolve()
+          )
       );
 
-      await new Promise<void>((resolve, reject) =>
-        execFile(
-          "unzip",
-          ["-q", target, "-d", extract],
-          {
-            timeout: 120000
-          },
-          (e) => (e ? reject(e) : resolve())
-        )
-      );
-
-      const files = await collectFiles(extract);
+      const files =
+        await collectFiles(extract);
 
       let total = 0;
 
       for (const f of files) {
-        const st = await fs.stat(f);
+        const st =
+          await fs.stat(f);
 
         total += st.size;
 
-        if (total > MAX_EXTRACTED) {
+        if (
+          total >
+          MAX_EXTRACTED
+        ) {
           throw new Error(
             "Archive expands beyond safety limit"
           );
@@ -195,12 +256,23 @@ export async function parseStoredFile(
 
         if (
           textExt.has(
-            path.extname(f).slice(1).toLowerCase()
+            path
+              .extname(f)
+              .slice(1)
+              .toLowerCase()
           )
         ) {
           outputs.push({
-            path: path.relative(extract, f),
-            content: await fs.readFile(f, "utf8")
+            path:
+              path.relative(
+                extract,
+                f
+              ),
+            content:
+              await fs.readFile(
+                f,
+                "utf8"
+              )
           });
         }
       }
@@ -209,39 +281,64 @@ export async function parseStoredFile(
       ext === "gz" ||
       ext === "tgz"
     ) {
-      const extract = path.join(tmp, "extract");
+      const extract = path.join(
+        tmp,
+        "extract"
+      );
 
       await fs.mkdir(extract);
 
       await tar.x({
         file: target,
         cwd: extract,
-        filter: (p) =>
+        filter: (
+          p: string
+        ) =>
           !path.isAbsolute(p) &&
-          !p.split("/").includes("..")
+          !p
+            .split("/")
+            .includes("..")
       });
 
-      for (const f of await collectFiles(extract)) {
+      for (const f of await collectFiles(
+        extract
+      )) {
         if (
           textExt.has(
-            path.extname(f).slice(1).toLowerCase()
+            path
+              .extname(f)
+              .slice(1)
+              .toLowerCase()
           )
         ) {
           outputs.push({
-            path: path.relative(extract, f),
-            content: await fs.readFile(f, "utf8")
+            path:
+              path.relative(
+                extract,
+                f
+              ),
+            content:
+              await fs.readFile(
+                f,
+                "utf8"
+              )
           });
         }
       }
     }
 
     return outputs.flatMap((x) =>
-      chunks(x.content).map((content, i) => ({
-        path: x.path,
-        chunkIndex: i,
-        content,
-        tokenCount: Math.ceil(content.length / 4)
-      }))
+      chunks(x.content).map(
+        (content, i) => ({
+          path: x.path,
+          chunkIndex: i,
+          content,
+          tokenCount:
+            Math.ceil(
+              content.length / 4
+            )
+        })
+      )
     );
   } finally {
     await fs.rm(tmp, {
@@ -251,14 +348,20 @@ export async function parseStoredFile(
   }
 }
 
-export async function sha256Stored(storageKey: string) {
-  const obj = await downloadObject(storageKey);
+export async function sha256Stored(
+  storageKey: string
+) {
+  const obj =
+    await downloadObject(
+      storageKey
+    );
 
   if (!obj.Body) {
     throw new Error("No body");
   }
 
-  const hash = crypto.createHash("sha256");
+  const hash =
+    crypto.createHash("sha256");
 
   for await (const chunk of obj.Body as any) {
     hash.update(chunk);
